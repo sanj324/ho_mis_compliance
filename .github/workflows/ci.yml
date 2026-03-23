@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ho_mis_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ho_mis_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      PORT: 4000
+      API_PREFIX: /api
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ho_mis_ci?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret-1234567890
+      JWT_REFRESH_SECRET: ci-refresh-secret-1234567890
+      JWT_ACCESS_TTL_MINUTES: 30
+      JWT_REFRESH_TTL_DAYS: 7
+      CORS_ORIGIN: http://localhost:5173
+      VITE_API_BASE_URL: http://localhost:4000/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @ho-mis/api prisma:generate
+
+      - name: Apply schema
+        run: pnpm --filter @ho-mis/api prisma:db:push
+
+      - name: Seed database
+        run: pnpm --filter @ho-mis/api prisma:seed
+
+      - name: Lint
+        run: |
+          pnpm --filter @ho-mis/api lint
+          pnpm --filter @ho-mis/web lint
+
+      - name: Typecheck
+        run: |
+          pnpm --filter @ho-mis/api typecheck
+          pnpm --filter @ho-mis/web typecheck
+
+      - name: Build
+        run: |
+          pnpm --filter @ho-mis/api build
+          pnpm --filter @ho-mis/web build
+
+      - name: Test
+        run: pnpm --filter @ho-mis/api test

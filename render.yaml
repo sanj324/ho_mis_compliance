@@ -1,0 +1,34 @@
+databases:
+  - name: ho-mis-db
+    plan: free
+    databaseName: ho_mis_compliance
+    user: ho_mis_user
+
+services:
+  - type: web
+    name: ho-mis-api
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @ho-mis/api prisma:generate && pnpm --filter @ho-mis/api build
+    startCommand: pnpm --filter @ho-mis/api prisma:db:push && node apps/api/dist/apps/api/src/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.11.0
+      - key: API_PREFIX
+        value: /api
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ho-mis-db
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_TTL_MINUTES
+        value: "30"
+      - key: JWT_REFRESH_TTL_DAYS
+        value: "7"
+      - key: CORS_ORIGIN
+        sync: false

@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "dist",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "prisma/**/*.ts", "../../packages/types/src/**/*.ts", "../../packages/utils/src/**/*.ts"],
+  "exclude": ["src/tests/**/*.ts", "src/common/utils/test-*.ts"]
+}

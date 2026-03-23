@@ -1,0 +1,5 @@
+export enum DocumentTypeEnum {
+  SUPPORTING = "SUPPORTING",
+  POLICY = "POLICY",
+  ACKNOWLEDGEMENT = "ACKNOWLEDGEMENT"
+}

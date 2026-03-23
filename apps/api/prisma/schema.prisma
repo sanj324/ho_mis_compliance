@@ -1,0 +1,1257 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleCode {
+  HO_ADMIN
+  BRANCH_MANAGER
+  BRANCH_DATA_ENTRY
+}
+
+enum ApprovalState {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum AuditAction {
+  LOGIN
+  REFRESH
+  CREATE
+  UPDATE
+  VIEW
+}
+
+enum ModuleName {
+  AUTH
+  USERS
+  BRANCHES
+  AUDIT
+  DASHBOARD
+  REPORTING
+  APPROVALS
+  EXECUTIVE_DASHBOARD
+  COMPLIANCE
+  NOTIFICATIONS
+  DOCUMENTS
+  LEDGER
+  DEPARTMENTS
+  DESIGNATIONS
+  COST_CENTERS
+  PAYROLL
+  INVESTMENTS
+  ASSETS
+  STATIONERY
+  SHARE_CAPITAL
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  WEEK_OFF
+  HOLIDAY
+  PAID_LEAVE
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Branch {
+  id            String        @id @default(uuid())
+  code          String        @unique
+  name          String
+  addressLine1  String?
+  city          String?
+  state         String?
+  isHeadOffice  Boolean       @default(false)
+  isActive      Boolean       @default(true)
+  approvalState ApprovalState @default(APPROVED)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  users         User[]
+  auditLogs     AuditLog[]
+  departments   Department[]
+  designations  Designation[]
+  costCenters   CostCenter[]
+  employees     Employee[]
+  payrollMonths PayrollMonth[]
+  payrollRuns   PayrollRun[]
+  attendance    AttendanceRecord[]
+  statutorySetups StatutorySetup[]
+  investments   Investment[]
+  investmentExposureSnapshots InvestmentExposureSnapshot[]
+  assets        Asset[]
+  outgoingAssetTransfers AssetTransfer[] @relation("AssetTransferFromBranch")
+  incomingAssetTransfers AssetTransfer[] @relation("AssetTransferToBranch")
+  requisitions Requisition[]
+  stockLedgers StockLedger[]
+  stockIssues StockIssue[]
+  outgoingStockTransfers StockTransfer[] @relation("StockTransferFromBranch")
+  incomingStockTransfers StockTransfer[] @relation("StockTransferToBranch")
+  stationeryExceptions StationeryException[]
+  members       Member[]
+  complianceEvents ComplianceEvent[]
+  complianceCalendarItems ComplianceCalendarItem[]
+  notifications Notification[]
+  documents DocumentAttachment[]
+  vouchers Voucher[]
+  reportGenerations ReportGeneration[]
+  approvalTasks ApprovalTask[]
+}
+
+model User {
+  id            String        @id @default(uuid())
+  username      String        @unique
+  fullName      String
+  email         String?       @unique
+  passwordHash  String
+  branchId      String?
+  isActive      Boolean       @default(true)
+  approvalState ApprovalState @default(APPROVED)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  branch        Branch?       @relation(fields: [branchId], references: [id])
+  userRoles     UserRole[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  finalizedPayrollRuns PayrollRun[] @relation("PayrollRunFinalizedBy")
+  notifications Notification[]
+  documents DocumentAttachment[]
+  vouchers Voucher[] @relation("VoucherPostedBy")
+  generatedReports ReportGeneration[] @relation("ReportGeneratedBy")
+  assignedApprovalTasks ApprovalTask[] @relation("ApprovalTaskAssignedUser")
+  approvalHistories ApprovalHistory[]
+}
+
+model Role {
+  id              String           @id @default(uuid())
+  code            RoleCode         @unique
+  name            String
+  description     String?
+  approvalState   ApprovalState    @default(APPROVED)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id              String           @id @default(uuid())
+  code            String           @unique
+  moduleName      ModuleName
+  action          String
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  rolePermissions RolePermission[]
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  role      Role     @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime   @default(now())
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  moduleName ModuleName
+  entityName String
+  entityId   String?
+  action     AuditAction
+  requestId  String
+  userId     String?
+  branchId   String?
+  oldValues  Json?
+  newValues  Json?
+  createdAt  DateTime    @default(now())
+  user       User?       @relation(fields: [userId], references: [id])
+  branch     Branch?     @relation(fields: [branchId], references: [id])
+
+  @@index([moduleName, createdAt])
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  userId     String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model Department {
+  id            String        @id @default(uuid())
+  code          String        @unique
+  name          String
+  branchId      String?
+  isActive      Boolean       @default(true)
+  approvalState ApprovalState @default(APPROVED)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  branch        Branch?       @relation(fields: [branchId], references: [id])
+  employees     Employee[]
+  assets        Asset[]
+}
+
+model Designation {
+  id            String        @id @default(uuid())
+  code          String        @unique
+  name          String
+  branchId      String?
+  isActive      Boolean       @default(true)
+  approvalState ApprovalState @default(APPROVED)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  branch        Branch?       @relation(fields: [branchId], references: [id])
+  employees     Employee[]
+}
+
+model CostCenter {
+  id            String        @id @default(uuid())
+  code          String        @unique
+  name          String
+  branchId      String?
+  isActive      Boolean       @default(true)
+  approvalState ApprovalState @default(APPROVED)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  branch        Branch?       @relation(fields: [branchId], references: [id])
+  employees     Employee[]
+  assets        Asset[]
+}
+
+model Employee {
+  id              String             @id @default(uuid())
+  employeeCode    String             @unique
+  fullName        String
+  dob             DateTime?
+  joiningDate     DateTime
+  branchId        String
+  departmentId    String?
+  designationId   String?
+  costCenterId    String?
+  panNo           String?
+  aadhaarNo       String?
+  uanNo           String?
+  esiNo           String?
+  bankAccountNo   String?
+  ifscCode        String?
+  activeStatus    Boolean            @default(true)
+  kycStatus       String             @default("PENDING")
+  approvalState   ApprovalState      @default(PENDING_APPROVAL)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  branch          Branch             @relation(fields: [branchId], references: [id])
+  department      Department?        @relation(fields: [departmentId], references: [id])
+  designation     Designation?       @relation(fields: [designationId], references: [id])
+  costCenter      CostCenter?        @relation(fields: [costCenterId], references: [id])
+  employeeKyc     EmployeeKyc?
+  attendance      AttendanceRecord[]
+  leaveRecords    LeaveRecord[]
+  salaryStructures SalaryStructure[]
+  payrollItems    PayrollRunItem[]
+  payrollExceptions PayrollException[]
+
+  @@index([branchId, activeStatus])
+}
+
+model EmployeeKyc {
+  id              String    @id @default(uuid())
+  employeeId      String    @unique
+  panVerified     Boolean   @default(false)
+  aadhaarVerified Boolean   @default(false)
+  bankVerified    Boolean   @default(false)
+  remarks         String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+}
+
+model AttendanceRecord {
+  id             String           @id @default(uuid())
+  employeeId     String
+  branchId       String
+  attendanceDate DateTime
+  status         AttendanceStatus
+  attendanceUnits Decimal         @default(1) @db.Decimal(5, 2)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  employee       Employee         @relation(fields: [employeeId], references: [id])
+  branch         Branch           @relation(fields: [branchId], references: [id])
+
+  @@unique([employeeId, attendanceDate])
+  @@index([branchId, attendanceDate])
+}
+
+model LeaveRecord {
+  id            String        @id @default(uuid())
+  employeeId    String
+  leaveType     String
+  startDate     DateTime
+  endDate       DateTime
+  totalDays     Decimal       @db.Decimal(5, 2)
+  status        LeaveStatus   @default(PENDING)
+  remarks       String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  employee      Employee      @relation(fields: [employeeId], references: [id])
+}
+
+model SalaryStructure {
+  id                String        @id @default(uuid())
+  employeeId        String
+  effectiveFrom     DateTime
+  basicPay          Decimal       @db.Decimal(18, 2)
+  hra               Decimal       @default(0) @db.Decimal(18, 2)
+  specialAllowance  Decimal       @default(0) @db.Decimal(18, 2)
+  conveyanceAllowance Decimal     @default(0) @db.Decimal(18, 2)
+  otherAllowance    Decimal       @default(0) @db.Decimal(18, 2)
+  isActive          Boolean       @default(true)
+  approvalState     ApprovalState @default(APPROVED)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  employee          Employee      @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, isActive])
+}
+
+model PayrollMonth {
+  id            String        @id @default(uuid())
+  branchId      String
+  month         Int
+  year          Int
+  isLocked      Boolean       @default(false)
+  approvalState ApprovalState @default(PENDING_APPROVAL)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  branch        Branch        @relation(fields: [branchId], references: [id])
+  payrollRuns   PayrollRun[]
+
+  @@unique([branchId, month, year])
+}
+
+model PayrollRun {
+  id              String         @id @default(uuid())
+  branchId        String
+  payrollMonthId  String
+  runCode         String         @unique
+  status          String         @default("CALCULATED")
+  approvalState   ApprovalState  @default(PENDING_APPROVAL)
+  totalGross      Decimal        @default(0) @db.Decimal(18, 2)
+  totalDeductions Decimal        @default(0) @db.Decimal(18, 2)
+  totalNet        Decimal        @default(0) @db.Decimal(18, 2)
+  finalizedAt     DateTime?
+  finalizedById   String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  branch          Branch         @relation(fields: [branchId], references: [id])
+  payrollMonth    PayrollMonth   @relation(fields: [payrollMonthId], references: [id])
+  finalizedBy     User?          @relation("PayrollRunFinalizedBy", fields: [finalizedById], references: [id])
+  items           PayrollRunItem[]
+  exceptions      PayrollException[]
+
+  @@index([branchId, status])
+}
+
+model PayrollRunItem {
+  id             String      @id @default(uuid())
+  payrollRunId   String
+  employeeId     String
+  grossPay       Decimal     @db.Decimal(18, 2)
+  pfDeduction    Decimal     @default(0) @db.Decimal(18, 2)
+  esiDeduction   Decimal     @default(0) @db.Decimal(18, 2)
+  ptDeduction    Decimal     @default(0) @db.Decimal(18, 2)
+  tdsDeduction   Decimal     @default(0) @db.Decimal(18, 2)
+  totalDeductions Decimal    @default(0) @db.Decimal(18, 2)
+  netPay         Decimal     @db.Decimal(18, 2)
+  exceptionCount Int         @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  payrollRun     PayrollRun  @relation(fields: [payrollRunId], references: [id])
+  employee       Employee    @relation(fields: [employeeId], references: [id])
+
+  @@index([payrollRunId, employeeId])
+}
+
+model StatutorySetup {
+  id             String    @id @default(uuid())
+  branchId       String?
+  effectiveFrom  DateTime
+  pfRateEmployee Decimal   @default(12) @db.Decimal(5, 2)
+  pfRateEmployer Decimal   @default(12) @db.Decimal(5, 2)
+  esiRateEmployee Decimal  @default(0.75) @db.Decimal(5, 2)
+  esiRateEmployer Decimal  @default(3.25) @db.Decimal(5, 2)
+  professionalTax Decimal  @default(200) @db.Decimal(18, 2)
+  tdsRate        Decimal   @default(10) @db.Decimal(5, 2)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  branch         Branch?   @relation(fields: [branchId], references: [id])
+
+  @@index([branchId, effectiveFrom])
+}
+
+model PayrollException {
+  id              String      @id @default(uuid())
+  payrollRunId     String?
+  employeeId       String?
+  exceptionCode    String
+  exceptionMessage String
+  severity         String
+  isResolved       Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  payrollRun       PayrollRun? @relation(fields: [payrollRunId], references: [id])
+  employee         Employee?   @relation(fields: [employeeId], references: [id])
+
+  @@index([payrollRunId, employeeId])
+}
+
+model Counterparty {
+  id          String       @id @default(uuid())
+  code        String       @unique
+  name        String
+  exposureLimit Decimal?   @db.Decimal(18, 2)
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  investments Investment[]
+}
+
+model SecurityType {
+  id            String       @id @default(uuid())
+  code          String       @unique
+  name          String
+  category      String
+  slrEligible   Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  investments   Investment[]
+}
+
+model Issuer {
+  id             String       @id @default(uuid())
+  code           String       @unique
+  name           String
+  issuerType     String
+  riskLimit      Decimal?     @db.Decimal(18, 2)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  investments    Investment[]
+}
+
+model Broker {
+  id             String       @id @default(uuid())
+  code           String       @unique
+  name           String
+  registrationNo String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  investments    Investment[]
+}
+
+model Investment {
+  id                  String                    @id @default(uuid())
+  investmentCode      String                    @unique
+  securityName        String
+  isin                String?                   @unique
+  branchId            String
+  securityTypeId      String
+  issuerId            String?
+  counterpartyId      String?
+  brokerId            String?
+  classification      String
+  purchaseDate        DateTime
+  maturityDate        DateTime?
+  couponRate          Decimal?                  @db.Decimal(8, 4)
+  faceValue           Decimal                   @db.Decimal(18, 2)
+  bookValue           Decimal                   @db.Decimal(18, 2)
+  marketValue         Decimal?                  @db.Decimal(18, 2)
+  yieldRate           Decimal?                  @db.Decimal(8, 4)
+  rating              String?
+  approvalState       ApprovalState             @default(PENDING_APPROVAL)
+  policyLimit         Decimal?                  @db.Decimal(18, 2)
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  branch              Branch                    @relation(fields: [branchId], references: [id])
+  securityType        SecurityType              @relation(fields: [securityTypeId], references: [id])
+  issuer              Issuer?                   @relation(fields: [issuerId], references: [id])
+  counterparty        Counterparty?             @relation(fields: [counterpartyId], references: [id])
+  broker              Broker?                   @relation(fields: [brokerId], references: [id])
+  accruals            InvestmentAccrual[]
+  transactions        InvestmentTransaction[]
+  exposureSnapshots   InvestmentExposureSnapshot[]
+  exceptions          InvestmentException[]
+
+  @@index([branchId, classification])
+  @@index([maturityDate, rating])
+}
+
+model InvestmentAccrual {
+  id            String      @id @default(uuid())
+  investmentId  String
+  accrualDate   DateTime
+  accrualAmount Decimal     @db.Decimal(18, 2)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  investment    Investment  @relation(fields: [investmentId], references: [id])
+
+  @@index([investmentId, accrualDate])
+}
+
+model InvestmentTransaction {
+  id             String      @id @default(uuid())
+  investmentId   String
+  transactionType String
+  transactionDate DateTime
+  amount         Decimal     @db.Decimal(18, 2)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  investment     Investment  @relation(fields: [investmentId], references: [id])
+
+  @@index([investmentId, transactionDate])
+}
+
+model InvestmentExposureSnapshot {
+  id               String      @id @default(uuid())
+  branchId         String
+  investmentId     String?
+  snapshotDate     DateTime
+  issuerExposure   Decimal     @default(0) @db.Decimal(18, 2)
+  counterpartyExposure Decimal @default(0) @db.Decimal(18, 2)
+  totalExposure    Decimal     @default(0) @db.Decimal(18, 2)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  branch           Branch      @relation(fields: [branchId], references: [id])
+  investment       Investment? @relation(fields: [investmentId], references: [id])
+
+  @@index([branchId, snapshotDate])
+}
+
+model InvestmentException {
+  id               String      @id @default(uuid())
+  investmentId     String?
+  exceptionCode    String
+  exceptionMessage String
+  severity         String
+  isResolved       Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  investment       Investment? @relation(fields: [investmentId], references: [id])
+
+  @@index([investmentId, createdAt])
+}
+
+model AssetCategory {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  name         String
+  usefulLifeMonths Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  assets       Asset[]
+}
+
+model DepreciationMethod {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  name         String
+  calculationType String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  assets       Asset[]
+}
+
+model Asset {
+  id                    String              @id @default(uuid())
+  assetCode             String              @unique
+  assetName             String
+  assetCategoryId       String
+  depreciationMethodId  String
+  branchId              String
+  departmentId          String?
+  costCenterId          String?
+  purchaseDate          DateTime
+  capitalizationDate    DateTime
+  originalCost          Decimal             @db.Decimal(18, 2)
+  usefulLifeMonths      Int
+  depreciationRate      Decimal             @db.Decimal(8, 4)
+  salvageValue          Decimal             @default(0) @db.Decimal(18, 2)
+  accumulatedDepreciation Decimal           @default(0) @db.Decimal(18, 2)
+  netBookValue          Decimal             @db.Decimal(18, 2)
+  insurancePolicyNo     String?
+  insuranceExpiryDate   DateTime?
+  warrantyExpiryDate    DateTime?
+  currentStatus         String              @default("ACTIVE")
+  currentHolder         String?
+  barcodeOrTagNo        String?             @unique
+  approvalState         ApprovalState       @default(PENDING_APPROVAL)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  assetCategory         AssetCategory       @relation(fields: [assetCategoryId], references: [id])
+  depreciationMethod    DepreciationMethod  @relation(fields: [depreciationMethodId], references: [id])
+  branch                Branch              @relation(fields: [branchId], references: [id])
+  department            Department?         @relation(fields: [departmentId], references: [id])
+  costCenter            CostCenter?         @relation(fields: [costCenterId], references: [id])
+  insurances            AssetInsurance[]
+  depreciationRuns      AssetDepreciationRun[]
+  transfers             AssetTransfer[]
+  disposals             AssetDisposal[]
+  verifications         AssetVerification[]
+  exceptions            AssetException[]
+
+  @@index([branchId, currentStatus])
+  @@index([insuranceExpiryDate, warrantyExpiryDate])
+}
+
+model AssetInsurance {
+  id                String   @id @default(uuid())
+  assetId           String
+  policyNo          String   @unique
+  insurerName       String
+  startDate         DateTime
+  expiryDate        DateTime
+  insuredValue      Decimal  @db.Decimal(18, 2)
+  premiumAmount     Decimal? @db.Decimal(18, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  asset             Asset    @relation(fields: [assetId], references: [id])
+
+  @@index([assetId, expiryDate])
+}
+
+model AssetDepreciationRun {
+  id                     String   @id @default(uuid())
+  assetId                String
+  runMonth               Int
+  runYear                Int
+  depreciationAmount     Decimal  @db.Decimal(18, 2)
+  accumulatedDepreciation Decimal @db.Decimal(18, 2)
+  closingNetBookValue    Decimal  @db.Decimal(18, 2)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  asset                  Asset    @relation(fields: [assetId], references: [id])
+
+  @@unique([assetId, runMonth, runYear])
+}
+
+model AssetTransfer {
+  id              String        @id @default(uuid())
+  assetId         String
+  fromBranchId    String
+  toBranchId      String
+  transferDate    DateTime
+  reason          String
+  approvalState   ApprovalState @default(PENDING_APPROVAL)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  asset           Asset         @relation(fields: [assetId], references: [id])
+  fromBranch      Branch        @relation("AssetTransferFromBranch", fields: [fromBranchId], references: [id])
+  toBranch        Branch        @relation("AssetTransferToBranch", fields: [toBranchId], references: [id])
+
+  @@index([assetId, transferDate])
+}
+
+model AssetDisposal {
+  id              String        @id @default(uuid())
+  assetId         String
+  disposalDate    DateTime
+  disposalValue   Decimal       @db.Decimal(18, 2)
+  netBookValueAtDisposal Decimal @db.Decimal(18, 2)
+  gainLossAmount  Decimal       @db.Decimal(18, 2)
+  reason          String?
+  approvalState   ApprovalState @default(PENDING_APPROVAL)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  asset           Asset         @relation(fields: [assetId], references: [id])
+
+  @@index([assetId, disposalDate])
+}
+
+model AssetVerification {
+  id               String   @id @default(uuid())
+  assetId          String
+  verificationDate DateTime
+  status           String
+  varianceRemarks  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  asset            Asset    @relation(fields: [assetId], references: [id])
+
+  @@index([assetId, verificationDate])
+}
+
+model AssetException {
+  id               String   @id @default(uuid())
+  assetId          String?
+  exceptionCode    String
+  exceptionMessage String
+  severity         String
+  isResolved       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  asset            Asset?   @relation(fields: [assetId], references: [id])
+
+  @@index([assetId, createdAt])
+}
+
+model ItemCategory {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  name        String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  items       StationeryItem[]
+}
+
+model StationeryItem {
+  id            String           @id @default(uuid())
+  itemCode      String           @unique
+  itemName      String
+  itemCategoryId String
+  unitOfMeasure String
+  reorderLevel  Decimal          @default(0) @db.Decimal(18, 2)
+  maxLevel      Decimal          @default(0) @db.Decimal(18, 2)
+  gstRate       Decimal          @default(0) @db.Decimal(5, 2)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  itemCategory  ItemCategory     @relation(fields: [itemCategoryId], references: [id])
+  requisitionItems RequisitionItem[]
+  stockLedgers  StockLedger[]
+  stockIssueItems StockIssueItem[]
+  stockTransfers StockTransfer[]
+  exceptions    StationeryException[]
+
+  @@index([itemCategoryId, itemName])
+}
+
+model Vendor {
+  id            String      @id @default(uuid())
+  code          String      @unique
+  name          String
+  gstNo         String?
+  contactPerson String?
+  phoneNo       String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  requisitions  Requisition[]
+}
+
+model Requisition {
+  id            String             @id @default(uuid())
+  requisitionNo String             @unique
+  branchId      String
+  vendorId      String?
+  requisitionDate DateTime
+  status        String             @default("PENDING")
+  approvalState ApprovalState      @default(PENDING_APPROVAL)
+  remarks       String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  branch        Branch             @relation(fields: [branchId], references: [id])
+  vendor        Vendor?            @relation(fields: [vendorId], references: [id])
+  items         RequisitionItem[]
+
+  @@index([branchId, requisitionDate])
+}
+
+model RequisitionItem {
+  id            String         @id @default(uuid())
+  requisitionId String
+  itemId        String
+  quantity      Decimal        @db.Decimal(18, 2)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  requisition   Requisition    @relation(fields: [requisitionId], references: [id])
+  item          StationeryItem @relation(fields: [itemId], references: [id])
+}
+
+model StockLedger {
+  id              String         @id @default(uuid())
+  itemId          String
+  branchId        String
+  transactionType String
+  quantity        Decimal        @db.Decimal(18, 2)
+  transactionDate DateTime
+  referenceType   String?
+  referenceId     String?
+  remarks         String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  item            StationeryItem @relation(fields: [itemId], references: [id])
+  branch          Branch         @relation(fields: [branchId], references: [id])
+
+  @@index([itemId, branchId, transactionDate])
+}
+
+model StockIssue {
+  id            String           @id @default(uuid())
+  issueNo       String           @unique
+  branchId      String
+  issueDate     DateTime
+  issueReason   String
+  approvalState ApprovalState    @default(PENDING_APPROVAL)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  branch        Branch           @relation(fields: [branchId], references: [id])
+  items         StockIssueItem[]
+
+  @@index([branchId, issueDate])
+}
+
+model StockIssueItem {
+  id            String         @id @default(uuid())
+  stockIssueId  String
+  itemId        String
+  quantity      Decimal        @db.Decimal(18, 2)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  stockIssue    StockIssue     @relation(fields: [stockIssueId], references: [id])
+  item          StationeryItem @relation(fields: [itemId], references: [id])
+}
+
+model StockTransfer {
+  id              String        @id @default(uuid())
+  transferNo      String        @unique
+  itemId          String
+  fromBranchId    String
+  toBranchId      String
+  quantity        Decimal       @db.Decimal(18, 2)
+  transferDate    DateTime
+  approvalState   ApprovalState @default(PENDING_APPROVAL)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  item            StationeryItem @relation(fields: [itemId], references: [id])
+  fromBranch      Branch        @relation("StockTransferFromBranch", fields: [fromBranchId], references: [id])
+  toBranch        Branch        @relation("StockTransferToBranch", fields: [toBranchId], references: [id])
+
+  @@index([itemId, transferDate])
+}
+
+model StationeryException {
+  id               String         @id @default(uuid())
+  itemId           String?
+  branchId         String?
+  exceptionCode    String
+  exceptionMessage String
+  severity         String
+  isResolved       Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  item             StationeryItem? @relation(fields: [itemId], references: [id])
+  branch           Branch?        @relation(fields: [branchId], references: [id])
+
+  @@index([itemId, branchId, createdAt])
+}
+
+model Member {
+  id                String                  @id @default(uuid())
+  memberCode        String                  @unique
+  memberName        String
+  branchId          String
+  panNo             String?
+  aadhaarNo         String?
+  kycStatus         String                  @default("PENDING")
+  memberStatus      String                  @default("ACTIVE")
+  freezeStatus      Boolean                 @default(false)
+  lienStatus        Boolean                 @default(false)
+  registrarRefNo    String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  branch            Branch                  @relation(fields: [branchId], references: [id])
+  memberKyc         MemberKyc?
+  allotments        ShareAllotment[]
+  outgoingTransfers ShareTransfer[]         @relation("ShareTransferFromMember")
+  incomingTransfers ShareTransfer[]         @relation("ShareTransferToMember")
+  redemptions       ShareRedemption[]
+  dividendPayments  DividendPayment[]
+  exceptions        ShareCapitalException[]
+
+  @@index([branchId, kycStatus, memberStatus])
+}
+
+model MemberKyc {
+  id              String   @id @default(uuid())
+  memberId        String   @unique
+  panVerified     Boolean  @default(false)
+  aadhaarVerified Boolean  @default(false)
+  remarks         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  member          Member   @relation(fields: [memberId], references: [id])
+}
+
+model ShareClass {
+  id                  String                @id @default(uuid())
+  code                String                @unique
+  name                String
+  faceValue           Decimal               @db.Decimal(18, 2)
+  dividendRate        Decimal?              @db.Decimal(8, 4)
+  isActive            Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  allotments          ShareAllotment[]
+  transfers           ShareTransfer[]
+  redemptions         ShareRedemption[]
+  dividendDeclarations DividendDeclaration[]
+}
+
+model ShareAllotment {
+  id                 String        @id @default(uuid())
+  memberId           String
+  shareClassId       String
+  allotmentDate      DateTime
+  noOfShares         Int
+  paidUpValue        Decimal       @db.Decimal(18, 2)
+  shareCertificateNo String?       @unique
+  approvalState      ApprovalState @default(PENDING_APPROVAL)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  member             Member        @relation(fields: [memberId], references: [id])
+  shareClass         ShareClass    @relation(fields: [shareClassId], references: [id])
+
+  @@index([memberId, shareClassId, allotmentDate])
+}
+
+model ShareTransfer {
+  id            String        @id @default(uuid())
+  fromMemberId  String
+  toMemberId    String
+  shareClassId  String
+  transferDate  DateTime
+  noOfShares    Int
+  approvalState ApprovalState @default(PENDING_APPROVAL)
+  remarks       String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  fromMember    Member        @relation("ShareTransferFromMember", fields: [fromMemberId], references: [id])
+  toMember      Member        @relation("ShareTransferToMember", fields: [toMemberId], references: [id])
+  shareClass    ShareClass    @relation(fields: [shareClassId], references: [id])
+
+  @@index([shareClassId, transferDate])
+}
+
+model ShareRedemption {
+  id              String        @id @default(uuid())
+  memberId        String
+  shareClassId    String
+  redemptionDate  DateTime
+  noOfShares      Int
+  redemptionValue Decimal       @db.Decimal(18, 2)
+  approvalState   ApprovalState @default(PENDING_APPROVAL)
+  remarks         String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  member          Member        @relation(fields: [memberId], references: [id])
+  shareClass      ShareClass    @relation(fields: [shareClassId], references: [id])
+
+  @@index([memberId, shareClassId, redemptionDate])
+}
+
+model DividendDeclaration {
+  id              String            @id @default(uuid())
+  shareClassId    String
+  declarationDate DateTime
+  dividendRate    Decimal           @db.Decimal(8, 4)
+  remarks         String?
+  approvalState   ApprovalState     @default(PENDING_APPROVAL)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  shareClass      ShareClass        @relation(fields: [shareClassId], references: [id])
+  payments        DividendPayment[]
+
+  @@index([shareClassId, declarationDate])
+}
+
+model DividendPayment {
+  id                    String              @id @default(uuid())
+  dividendDeclarationId String
+  memberId              String
+  noOfShares            Int
+  dividendAmount        Decimal             @db.Decimal(18, 2)
+  paymentDate           DateTime?
+  paymentStatus         String              @default("PENDING")
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  dividendDeclaration   DividendDeclaration @relation(fields: [dividendDeclarationId], references: [id])
+  member                Member              @relation(fields: [memberId], references: [id])
+
+  @@unique([dividendDeclarationId, memberId])
+  @@index([paymentStatus, paymentDate])
+}
+
+model ShareCapitalException {
+  id               String   @id @default(uuid())
+  memberId         String?
+  exceptionCode    String
+  exceptionMessage String
+  severity         String
+  isResolved       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  member           Member?  @relation(fields: [memberId], references: [id])
+
+  @@index([memberId, createdAt])
+}
+
+model ComplianceRule {
+  id                String      @id @default(uuid())
+  ruleCode          String      @unique
+  ruleName          String
+  moduleName        ModuleName
+  entityType        String
+  severity          String
+  triggerType       String
+  description       String
+  isActive          Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  events            ComplianceEvent[]
+}
+
+model ComplianceEvent {
+  id                String          @id @default(uuid())
+  complianceRuleId  String?
+  moduleName        ModuleName
+  entityType        String
+  entityId          String
+  ruleCode          String
+  ruleDescription   String
+  severity          String
+  branchId          String?
+  status            String          @default("OPEN")
+  detectedOn        DateTime        @default(now())
+  dueDate           DateTime?
+  escalatedTo       String?
+  remarks           String?
+  closedBy          String?
+  closedOn          DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  complianceRule    ComplianceRule? @relation(fields: [complianceRuleId], references: [id])
+  branch            Branch?         @relation(fields: [branchId], references: [id])
+
+  @@index([moduleName, status, severity])
+  @@unique([moduleName, entityType, entityId, ruleCode, status])
+}
+
+model ComplianceCalendarItem {
+  id               String      @id @default(uuid())
+  title            String
+  moduleName       ModuleName
+  frequency        String
+  dueDate          DateTime
+  branchId         String?
+  status           String      @default("UPCOMING")
+  filingReference  String?
+  remarks          String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  branch           Branch?     @relation(fields: [branchId], references: [id])
+
+  @@index([moduleName, dueDate, status])
+}
+
+model Notification {
+  id               String      @id @default(uuid())
+  userId           String?
+  branchId         String?
+  moduleName       ModuleName
+  title            String
+  message          String
+  severity         String
+  referenceType    String?
+  referenceId      String?
+  isRead           Boolean     @default(false)
+  readAt           DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  user             User?       @relation(fields: [userId], references: [id])
+  branch           Branch?     @relation(fields: [branchId], references: [id])
+
+  @@index([userId, isRead, createdAt])
+}
+
+model DocumentAttachment {
+  id               String      @id @default(uuid())
+  moduleName       ModuleName
+  entityType       String
+  entityId         String
+  documentType     String
+  fileName         String
+  filePath         String
+  mimeType         String?
+  fileSize         Int?
+  branchId         String?
+  uploadedById     String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  branch           Branch?     @relation(fields: [branchId], references: [id])
+  uploadedBy       User?       @relation(fields: [uploadedById], references: [id])
+
+  @@index([moduleName, entityType, entityId])
+}
+
+model LedgerAccount {
+  id               String      @id @default(uuid())
+  accountCode      String      @unique
+  accountName      String
+  accountType      String
+  branchScoped     Boolean     @default(false)
+  isActive         Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  debitLines       VoucherLine[] @relation("VoucherLineDebitAccount")
+  creditLines      VoucherLine[] @relation("VoucherLineCreditAccount")
+  sourceMappings   ModuleLedgerMapping[] @relation("ModuleLedgerSourceAccount")
+  targetMappings   ModuleLedgerMapping[] @relation("ModuleLedgerTargetAccount")
+}
+
+model ModuleLedgerMapping {
+  id               String        @id @default(uuid())
+  moduleName       ModuleName
+  eventCode        String
+  debitAccountId   String
+  creditAccountId  String
+  narrationTemplate String
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  debitAccount     LedgerAccount @relation("ModuleLedgerSourceAccount", fields: [debitAccountId], references: [id])
+  creditAccount    LedgerAccount @relation("ModuleLedgerTargetAccount", fields: [creditAccountId], references: [id])
+
+  @@unique([moduleName, eventCode])
+}
+
+model Voucher {
+  id               String       @id @default(uuid())
+  voucherNo        String       @unique
+  moduleName       ModuleName
+  referenceType    String
+  referenceId      String
+  branchId         String?
+  postingDate      DateTime
+  narration        String
+  status           String       @default("POSTED")
+  totalAmount      Decimal      @db.Decimal(18, 2)
+  postedById       String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  branch           Branch?      @relation(fields: [branchId], references: [id])
+  postedBy         User?        @relation("VoucherPostedBy", fields: [postedById], references: [id])
+  lines            VoucherLine[]
+
+  @@index([moduleName, postingDate, branchId])
+}
+
+model VoucherLine {
+  id               String        @id @default(uuid())
+  voucherId        String
+  lineNo           Int
+  debitAccountId   String
+  creditAccountId  String
+  amount           Decimal       @db.Decimal(18, 2)
+  description      String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  voucher          Voucher       @relation(fields: [voucherId], references: [id])
+  debitAccount     LedgerAccount @relation("VoucherLineDebitAccount", fields: [debitAccountId], references: [id])
+  creditAccount    LedgerAccount @relation("VoucherLineCreditAccount", fields: [creditAccountId], references: [id])
+
+  @@index([voucherId, lineNo])
+}
+
+model ReportDefinition {
+  id               String      @id @default(uuid())
+  reportCode       String      @unique
+  reportName       String
+  moduleName       ModuleName
+  description      String?
+  defaultFormat    String      @default("CSV")
+  queryKey         String
+  isActive         Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  generations      ReportGeneration[]
+}
+
+model ReportGeneration {
+  id               String           @id @default(uuid())
+  reportDefinitionId String
+  format           String
+  status           String           @default("GENERATED")
+  filters          Json?
+  outputFileName   String
+  outputMimeType   String
+  branchId         String?
+  generatedById    String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  reportDefinition ReportDefinition @relation(fields: [reportDefinitionId], references: [id])
+  branch           Branch?          @relation(fields: [branchId], references: [id])
+  generatedBy      User?            @relation("ReportGeneratedBy", fields: [generatedById], references: [id])
+
+  @@index([createdAt, status])
+}
+
+model ApprovalTask {
+  id               String      @id @default(uuid())
+  moduleName       ModuleName
+  entityType       String
+  entityId         String
+  title            String
+  status           String      @default("PENDING")
+  approvalState    ApprovalState @default(PENDING_APPROVAL)
+  assignedRoleCode String
+  assignedUserId   String?
+  branchId         String?
+  requestedBy      String?
+  reason           String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  assignedUser     User?       @relation("ApprovalTaskAssignedUser", fields: [assignedUserId], references: [id])
+  branch           Branch?     @relation(fields: [branchId], references: [id])
+  histories        ApprovalHistory[]
+
+  @@index([status, assignedRoleCode, assignedUserId])
+}
+
+model ApprovalHistory {
+  id               String      @id @default(uuid())
+  approvalTaskId   String
+  action           String
+  actionById       String?
+  reason           String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  approvalTask     ApprovalTask @relation(fields: [approvalTaskId], references: [id])
+  actionBy         User?       @relation(fields: [actionById], references: [id])
+
+  @@index([approvalTaskId, createdAt])
+}

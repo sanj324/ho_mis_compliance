@@ -1,0 +1,16 @@
+{
+  "name": "ho-mis-compliance",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.6.5",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --parallel --filter @ho-mis/api --filter @ho-mis/web dev",
+    "lint": "pnpm -r typecheck",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.2"
+  }
+}
