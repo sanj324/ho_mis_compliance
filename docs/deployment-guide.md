@@ -48,6 +48,12 @@ pnpm --filter @ho-mis/api build
 node apps/api/dist/apps/api/src/server.js
 ```
 
+If your host has issues with `corepack`, install pnpm explicitly first:
+
+```bash
+npm install -g pnpm@10.6.5
+```
+
 Operational checks:
 
 - confirm `GET /health` returns `200`
@@ -66,8 +72,10 @@ Recommended Render flow:
 
 1. Push this repository to GitHub.
 2. In Render, create a new Blueprint and point it at the GitHub repo.
-3. Set `CORS_ORIGIN` to your final Vercel frontend URL.
-4. After the first deploy, verify:
+3. If Render fails while resolving `pnpm` through `corepack`, use:
+   - Build command: `npm install -g pnpm@10.6.5 && pnpm install --frozen-lockfile && pnpm --filter @ho-mis/api prisma:generate && pnpm --filter @ho-mis/api build`
+4. Set `CORS_ORIGIN` to your final Vercel frontend URL.
+5. After the first deploy, verify:
    - `GET /health`
    - DB schema push completed
    - login works
