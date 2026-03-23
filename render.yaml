@@ -11,7 +11,7 @@ services:
     plan: free
     rootDir: .
     buildCommand: npm install -g pnpm@10.6.5 && pnpm install --frozen-lockfile && pnpm --filter @ho-mis/api prisma:generate && pnpm --filter @ho-mis/api build
-    startCommand: pnpm --filter @ho-mis/api prisma:db:push && node apps/api/dist/apps/api/src/server.js
+    startCommand: pnpm --filter @ho-mis/api prisma:db:push && pnpm --filter @ho-mis/api prisma:seed && node apps/api/dist/apps/api/src/server.js
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION

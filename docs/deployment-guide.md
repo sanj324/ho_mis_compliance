@@ -74,8 +74,10 @@ Recommended Render flow:
 2. In Render, create a new Blueprint and point it at the GitHub repo.
 3. If Render fails while resolving `pnpm` through `corepack`, use:
    - Build command: `npm install -g pnpm@10.6.5 && pnpm install --frozen-lockfile && pnpm --filter @ho-mis/api prisma:generate && pnpm --filter @ho-mis/api build`
-4. Set `CORS_ORIGIN` to your final Vercel frontend URL.
-5. After the first deploy, verify:
+4. If Render shell access is unavailable, use this start command so seed runs automatically on deploy:
+   - Start command: `pnpm --filter @ho-mis/api prisma:db:push && pnpm --filter @ho-mis/api prisma:seed && node apps/api/dist/apps/api/src/server.js`
+5. Set `CORS_ORIGIN` to your final Vercel frontend URL.
+6. After the first deploy, verify:
    - `GET /health`
    - DB schema push completed
    - login works
